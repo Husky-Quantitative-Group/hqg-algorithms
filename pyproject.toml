@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hqg-algorithms"
+version = "0.0.0"
+description = "Algorithmic trading research utilities for quant teams"
+readme = "README.md"
+requires-python = ">=3.8"
+
+[tool.setuptools]
+packages = ["hqg_algorithms"]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/hqg-algorithms"
