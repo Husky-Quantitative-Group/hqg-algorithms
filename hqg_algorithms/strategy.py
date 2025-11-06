@@ -53,7 +53,13 @@ class Strategy(ABC):
 
         Returns:
             dict[str, float]: target portfolio weights, e.g. {"SPY": 0.6, "IEF": 0.4}
-            or None to indicate no change / hold current allocation.
+            or None to indicate no change to previous allocation
+
+        - The returned dictionary expresses the complete target allocation.
+        - If a symbol is omitted, we sell it down to zero.
+        - Sum of weights less than 1 implies remaining balance held as cash.
+        - {} means we should covert our portfolio to fully cash.
+        - None means skip rebalance (no signal update this bar).
 
         Called automatically according to cadence().
         """
