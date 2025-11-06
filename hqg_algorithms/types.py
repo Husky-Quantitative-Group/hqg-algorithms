@@ -1,4 +1,4 @@
-# types.py
+"""types.py"""
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional
@@ -35,3 +35,12 @@ class Slice(dict[str, dict[str, float]]):
     def close(self, symbol: str) -> Optional[float]:
         """Return the close price for a symbol, or None if missing."""
         return self.get(symbol, {}).get("close")
+
+
+@dataclass(frozen=True)
+class PortfolioView:
+    """Read-only snapshot of the strategy’s current portfolio state."""
+    equity: float                 # total value of the strategy's portfolio
+    cash: float                   # available, unallocated cash
+    positions: dict[str, float]   # quantity of each symbol
+    weights: dict[str, float]     # current portfolio weights (by value)

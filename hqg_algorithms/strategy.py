@@ -1,6 +1,6 @@
 """strategy.py"""
 from abc import ABC, abstractmethod
-from hqg_algorithms.types import Cadence, Slice
+from hqg_algorithms.types import Cadence, Slice, PortfolioView
 
 class Strategy(ABC):
     """
@@ -43,7 +43,7 @@ class Strategy(ABC):
         """
 
     @abstractmethod
-    def on_data(self, data: Slice) -> dict[str, float] | None:
+    def on_data(self, data: Slice, portfolio: PortfolioView) -> dict[str, float] | None:
         """
         Main signal logic.
 
