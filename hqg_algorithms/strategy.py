@@ -1,6 +1,6 @@
 """strategy.py"""
 from abc import ABC, abstractmethod
-from typing import Any
+from hqg_algorithms.types import Cadence, Slice
 
 class Strategy(ABC):
     """
@@ -32,7 +32,7 @@ class Strategy(ABC):
         """
 
     @abstractmethod
-    def cadence(self) -> Any:
+    def cadence(self) -> Cadence:
         """
         Return a Cadence object or similar structure describing:
           - bar_size (e.g., 1 day, 5 minutes)
@@ -43,7 +43,7 @@ class Strategy(ABC):
         """
 
     @abstractmethod
-    def on_data(self, data: dict) -> dict[str, float] | None:
+    def on_data(self, data: Slice) -> dict[str, float] | None:
         """
         Main signal logic.
 
