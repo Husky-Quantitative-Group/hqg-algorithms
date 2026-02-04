@@ -15,13 +15,16 @@ Subclass `Strategy` and implement the three abstract methods the backtester call
 Example:
 
 ```python
-from datetime import timedelta
-from hqg_algorithms import Strategy, Cadence, Slice, PortfolioView
+from datetime import date, timedelta
+from hqg_algorithms import Strategy, BacktestWindow, Cadence, Slice, PortfolioView
 
 
 class BuyAndRebalanceSpyIef(Strategy):
     def universe(self) -> list[str]:
         return ["SPY", "IEF"]
+
+    def backtest_window(self) -> BacktestWindow:
+        return BacktestWindow(date(2010, 1, 1), date(2024, 12, 31))
 
     def cadence(self) -> Cadence:
         return Cadence( 
@@ -37,6 +40,7 @@ class BuyAndRebalanceSpyIef(Strategy):
 
 Key lifecycle methods:
 - `universe()` tells the platform which symbols to load.
+- `backtest_window()` sets mandatory start/end dates for the backtest.
 - `cadence()` specifies call frequency, trigger phase, and execution lag.
 - `on_data(data, portfolio)` returns target portfolio weights, `{}` for all cash, or `None` to skip an update.
 

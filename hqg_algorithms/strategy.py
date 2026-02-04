@@ -1,6 +1,6 @@
 """strategy.py"""
 from abc import ABC, abstractmethod
-from hqg_algorithms.types import Cadence, Slice, PortfolioView
+from hqg_algorithms.types import BacktestWindow, Cadence, Slice, PortfolioView
 
 class Strategy(ABC):
     """
@@ -8,13 +8,15 @@ class Strategy(ABC):
 
     Each subclass defines:
       - The asset universe it trades.
+            - The backtest window (mandatory start/end dates).
       - The cadence (how often it's called and when trades execute).
       - The trading logic that converts data into target portfolio weights.
 
     The backtester calls:
       1. strategy.universe() to know what tickers to load.
-      2. strategy.cadence() to schedule on_data calls.
-      3. strategy.on_data(t, slice_) each time new data arrives.
+    2. strategy.backtest_window() to set the start/end date range.
+    3. strategy.cadence() to schedule on_data calls.
+    4. strategy.on_data(t, slice_) each time new data arrives.
     """
 
     def __init__(self) -> None:
@@ -29,6 +31,17 @@ class Strategy(ABC):
             return ["SPY", "IEF", "GLD"]
 
         Used by the backtester to determine what data to load.
+        """
+
+    @abstractmethod
+    def backtest_window(self) -> BacktestWindow:
+        """
+        Return a BacktestWindow with mandatory start and end dates.
+
+        Example:
+            return BacktestWindow(date(2010, 1, 1), date(2024, 12, 31))
+
+        Used by the backtester to constrain the historical data window.
         """
 
     @abstractmethod

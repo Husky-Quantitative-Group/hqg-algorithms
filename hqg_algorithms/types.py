@@ -1,6 +1,6 @@
 """types.py"""
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Optional
 
 @dataclass(frozen=True)
@@ -9,6 +9,13 @@ class Cadence:
     bar_size: timedelta = timedelta(days=1)
     call_phase: str = "on_bar_close"   # or "on_bar_open"
     exec_lag_bars: int = 1             # bars between signal and execution
+
+
+@dataclass(frozen=True)
+class BacktestWindow:
+    """Defines the mandatory start/end date for a strategy's backtest."""
+    start_date: date
+    end_date: date
 
 
 class Slice(dict[str, dict[str, float]]):
