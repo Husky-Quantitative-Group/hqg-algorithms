@@ -1,14 +1,26 @@
 """types.py"""
 from dataclasses import dataclass
-from datetime import timedelta
+from enum import Enum
 from typing import Optional
+
+
+class BarSize(str, Enum):
+    DAILY = "1d"
+    WEEKLY = "1w"
+    MONTHLY = "1m"
+    QUARTERLY = "1q"
+
+class CallPhase(str, Enum):
+    ON_BAR_CLOSE = "on_bar_close"
+    ON_BAR_OPEN = "on_bar_open"
+
 
 @dataclass(frozen=True)
 class Cadence:
     """Defines how often a strategy runs and when trades execute."""
-    bar_size: timedelta = timedelta(days=1)
-    call_phase: str = "on_bar_close"   # or "on_bar_open"
-    exec_lag_bars: int = 1             # bars between signal and execution
+    bar_size: BarSize = BarSize.DAILY              # bar resolution (1d, 1w, 1m, 1q)
+    call_phase: CallPhase = CallPhase.ON_BAR_CLOSE # when on_data fires within each bar
+    exec_lag_bars: int = 0                         # bars between signal and execution
 
 
 class Slice(dict[str, dict[str, float]]):
@@ -32,14 +44,32 @@ class Slice(dict[str, dict[str, float]]):
         """Check whether this slice includes a given symbol."""
         return symbol in self
 
+    def _get_field(self, symbol: str, field: str) -> Optional[float]:
+        """Return a specific OHLCV field for a symbol, or None if missing."""
+        return self.get(symbol, {}).get(field)
+
+    def open(self, symbol: str) -> Optional[float]:
+        """Return the open price for a symbol, or None if missing."""
+        return self._get_field(symbol, "open")
+
+    def high(self, symbol: str) -> Optional[float]:
+        """Return the high price for a symbol, or None if missing."""
+        return self._get_field(symbol, "high")
+
+    def low(self, symbol: str) -> Optional[float]:
+        """Return the low price for a symbol, or None if missing."""
+        return self._get_field(symbol, "low")
+
     def close(self, symbol: str) -> Optional[float]:
         """Return the close price for a symbol, or None if missing."""
-        return self.get(symbol, {}).get("close")
+        return self._get_field(symbol, "close")
 
-
+    def volume(self, symbol: str) -> Optional[float]:
+        """Return the volume for a symbol, or None if missing."""
+        return self._get_field(symbol, "volume")
 @dataclass(frozen=True)
 class PortfolioView:
-    """Read-only snapshot of the strategy’s current portfolio state."""
+    """Read-only snapshot of the strategy's current portfolio state."""
     equity: float                 # total value of the strategy's portfolio
     cash: float                   # available, unallocated cash
     positions: dict[str, float]   # quantity of each symbol
