@@ -18,9 +18,9 @@ class CallPhase(str, Enum):
 @dataclass(frozen=True)
 class Cadence:
     """Defines how often a strategy runs and when trades execute."""
-    bar_size: BarSize = BarSize.DAILY
-    call_phase: CallPhase = CallPhase.ON_BAR_CLOSE
-    exec_lag_bars: int = 0
+    bar_size: BarSize = BarSize.DAILY              # bar resolution (1d, 1w, 1m, 1q)
+    call_phase: CallPhase = CallPhase.ON_BAR_CLOSE # when on_data fires within each bar
+    exec_lag_bars: int = 0                         # bars between signal and execution
 
 
 class Slice(dict[str, dict[str, float]]):
