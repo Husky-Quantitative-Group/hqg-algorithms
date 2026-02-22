@@ -10,17 +10,17 @@ class BarSize(str, Enum):
     MONTHLY = "1m"
     QUARTERLY = "1q"
 
-class CallPhase(str, Enum):
-    ON_BAR_CLOSE = "on_bar_close"
-    ON_BAR_OPEN = "on_bar_open"
+class ExecutionTiming(str, Enum):
+    CLOSE_TO_CLOSE = "close_to_close"           # signal on close, fill same close
+    CLOSE_TO_NEXT_OPEN = "close_to_next_open"   # signal on close, fill next open
+    OPEN_TO_OPEN = "open_to_open"               # signal on open, fill same open
 
 
 @dataclass(frozen=True)
 class Cadence:
     """Defines how often a strategy runs and when trades execute."""
-    bar_size: BarSize = BarSize.DAILY              # bar resolution (1d, 1w, 1m, 1q)
-    call_phase: CallPhase = CallPhase.ON_BAR_CLOSE # when on_data fires within each bar
-    exec_lag_bars: int = 0                         # bars between signal and execution
+    bar_size: BarSize = BarSize.DAILY                               # bar resolution (1d, 1w, 1m, 1q)
+    execution: ExecutionTiming = ExecutionTiming.CLOSE_TO_CLOSE     # signal on close, fill same close
 
 @dataclass(frozen=True)
 class Bar:

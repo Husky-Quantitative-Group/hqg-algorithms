@@ -35,9 +35,9 @@ class Strategy(ABC):
     def cadence(self) -> Cadence:
         """
         Return a Cadence object describing:
-          - bar_size (e.g., 1 day, 1 week)
-          - call_phase ("on_bar_close" or "on_bar_open")
-          - exec_lag_bars (how many bars later to execute trades)
+          - bar_size (e.g., daily, weekly)
+          - execution (when on_data fires and when trades fill, e.g.
+            CLOSE_TO_NEXT_OPEN, CLOSE_TO_CLOSE, or OPEN_TO_OPEN)
 
         This tells the executor when to call on_data and when to fill orders.
         """
