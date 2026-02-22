@@ -33,7 +33,7 @@ class Bar:
     volume: float
 
 
-class Slice(dict[str, Bar]):
+class Slice(Mapping[str, Bar]):
     """
     Snapshot of OHLCV data for all symbols at one timestep.
 
@@ -44,43 +44,57 @@ class Slice(dict[str, Bar]):
         }
     """
 
+    def __init__(self, data: dict[str, Bar]):
+        self._data = dict(data)
+
+    def __getitem__(self, key: str) -> Bar:
+        return self._data[key]
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __repr__(self) -> str:
+        return f"Slice({self._data!r})"
+
     def symbols(self) -> list[str]:
         """Return list of all symbols in this slice."""
-        return list(self.keys())
+        return list(self._data.keys())
 
     def has(self, symbol: str) -> bool:
         """Check whether this slice includes a given symbol."""
-        return symbol in self
+        return symbol in self._data
 
     def bar(self, symbol: str) -> Optional[Bar]:
         """Return the full Bar for a symbol, or None if missing."""
-        return self.get(symbol)
+        return self._data.get(symbol)
 
     def open(self, symbol: str) -> Optional[float]:
         """Return the open price for a symbol, or None if missing."""
-        b = self.get(symbol)
+        b = self._data.get(symbol)
         return b.open if b is not None else None
 
     def high(self, symbol: str) -> Optional[float]:
         """Return the high price for a symbol, or None if missing."""
-        b = self.get(symbol)
+        b = self._data.get(symbol)
         return b.high if b is not None else None
 
     def low(self, symbol: str) -> Optional[float]:
         """Return the low price for a symbol, or None if missing."""
-        b = self.get(symbol)
+        b = self._data.get(symbol)
         return b.low if b is not None else None
 
     def close(self, symbol: str) -> Optional[float]:
         """Return the close price for a symbol, or None if missing."""
-        b = self.get(symbol)
+        b = self._data.get(symbol)
         return b.close if b is not None else None
 
     def volume(self, symbol: str) -> Optional[float]:
         """Return the volume for a symbol, or None if missing."""
-        b = self.get(symbol)
+        b = self._data.get(symbol)
         return b.volume if b is not None else None
-
 
 @dataclass(frozen=True)
 class PortfolioView:
