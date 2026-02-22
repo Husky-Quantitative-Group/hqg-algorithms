@@ -22,6 +22,7 @@ class Cadence:
     bar_size: BarSize = BarSize.DAILY                               # bar resolution (1d, 1w, 1m, 1q)
     execution: ExecutionTiming = ExecutionTiming.CLOSE_TO_CLOSE     # signal on close, fill same close
 
+
 @dataclass(frozen=True)
 class Bar:
     """OHLCV data for a single symbol at one timestep."""
@@ -89,6 +90,7 @@ class PortfolioView:
     positions: dict[str, float]   # quantity of each symbol
     weights: dict[str, float]     # current portfolio weights (by value)
 
+
 class Signal:
     """Base class for all strategy signals returned by on_data()."""
 
@@ -100,15 +102,28 @@ class TargetWeights(Signal):
     - Symbols present in `weights` are sized to the specified fraction of portfolio equity. 
     - Symbols absent from `weights` are sold to zero.
     - Weights summing to less than 1.0 leave the remainder in cash.
+    
+    Raises:
+        ValueError: If any weight is negative or weights sum above 1.0.
+        Bad input are likely a logic/math ERROR, not something we should try to clamp or normalize. 
     """
     weights: Mapping[str, float]
 
+    def __post_init__(self) -> None:
+        negative = {s: w for s, w in self.weights.items() if w < 0}
+        if negative:
+            raise ValueError(f"Negative weights are not allowed: {negative}")
+        total = sum(self.weights.values())
+        if total > 1.0 + 1e-7:
+            raise ValueError(
+                f"Weights sum to {total:.6f}, which exceeds 1.0. "
+                "Use weights that sum to at most 1.0 (remainder is held as cash)."
+            )
 
 class Hold(Signal):
     """
     Keep the current portfolio unchanged this bar.
     """
-
 
 class Liquidate(Signal):
     """

@@ -59,6 +59,7 @@ class Strategy(ABC):
                 - Set the portfolio to these target weights. 
                 - Omitted symbols are sold to zero.
                 - Weights summing to less than 1.0 leave the remainder in cash.
+                - ValueError: If any weight is negative or weights sum above 1.0.
             Hold()
                 Keep the current allocation unchanged (skip this bar).
             Liquidate()
