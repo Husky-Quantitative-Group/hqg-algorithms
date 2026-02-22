@@ -32,7 +32,7 @@ class BuyAndRebalance(Strategy):
 | `cadence()` | Bar resolution, trigger timing, and execution delay |
 | `on_data()` | Return target portfolio weights, `{}` for all cash, or `None` to skip an update |
 
-`Slice` exposes helpers like `data.close("SPY")` to read prices. `PortfolioView` gives read-only access to current equity, cash, positions, and weights.
+`Slice` maps each symbol to a `Bar` dataclass with typed fields (`open`, `high`, `low`, `close`, `volume`). You can access prices via helpers like `data.close("SPY")`, or grab the full bar with `data.bar("SPY")` for direct attribute access. `PortfolioView` gives read-only access to current equity, cash, positions, and weights.
 
 ## Example — SMA crossover
 ```python
