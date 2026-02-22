@@ -3,6 +3,7 @@
 Interfaces and helper types for writing HQG trading strategies.
 
 ## Install
+
 ```shell
 python3 -m pip install --upgrade pip setuptools wheel
 pip install hqg-algorithms
@@ -11,6 +12,7 @@ pip install hqg-algorithms
 ## Quick start
 
 Subclass `Strategy` and implement three methods:
+
 ```python
 from hqg_algorithms import (
     Strategy, Cadence, Slice, PortfolioView,
@@ -29,10 +31,10 @@ class BuyAndRebalance(Strategy):
 ```
 
 | Method | Purpose |
-|--------|---------|
+| -------- | --------- |
 | `universe()` | Symbols the platform loads for this strategy |
 | `cadence()` | Bar resolution and execution timing |
-| `on_data()` | Return target portfolio weights, `{}` for all cash, or `None` to skip an update |
+| `on_data()` | Return a `Signal`: `TargetWeights(...)`, `Hold()`, or `Liquidate()` |
 
 `Slice` maps each symbol to a `Bar` dataclass with typed fields (`open`, `high`, `low`, `close`, `volume`). You can access prices via helpers like `data.close("SPY")`, or grab the full bar with `data.bar("SPY")` for direct attribute access. `PortfolioView` gives read-only access to current equity, cash, positions, and weights.
 
@@ -41,7 +43,7 @@ class BuyAndRebalance(Strategy):
 `ExecutionTiming` controls when your strategy receives data and when the resulting trades fill. Pick the option that matches your signal logic:
 
 | `ExecutionTiming` | `on_data` fires at | Trades fill at |
-|---|---|---|---|
+| --- | --- | --- |
 | `CLOSE_TO_NEXT_OPEN` | Bar close | Next bar's open |
 | `CLOSE_TO_CLOSE` | Bar close | Same bar's close (DEFAULT) |
 | `OPEN_TO_OPEN` | Bar open | Same bar's open |
@@ -58,8 +60,8 @@ class BuyAndRebalance(Strategy):
 | `Hold()` | Keep the current allocation unchanged. |
 | `Liquidate()` | Sell all positions and move fully to cash. |
 
-
 ## Example — SMA crossover
+
 ```python
 from hqg_algorithms import (
     Strategy, Cadence, Slice, PortfolioView,
