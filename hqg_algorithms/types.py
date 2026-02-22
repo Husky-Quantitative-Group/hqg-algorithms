@@ -31,7 +31,7 @@ class Bar:
     high: float
     low: float
     close: float
-    volume: float
+    volume: Optional[float]     # not available for all data
 
 
 class Slice(Mapping[str, Bar]):
@@ -100,17 +100,14 @@ class Slice(Mapping[str, Bar]):
 @dataclass(frozen=True)
 class PortfolioView:
     """Read-only snapshot of the strategy's current portfolio state."""
-    equity: float                 # total value of the strategy's portfolio
-    cash: float                   # available, unallocated cash
-    positions: dict[str, float]   # quantity of each symbol
-    weights: dict[str, float]     # current portfolio weights (by value)
+    equity: float                    # total value of the strategy's portfolio
+    cash: float                      # available, unallocated cash
+    positions: Mapping[str, float]   # quantity of each symbol
+    weights: Mapping[str, float]     # current portfolio weights (by value)
 
-    def __init__(self, equity: float, cash: float,
-                 positions: dict[str, float], weights: dict[str, float]):
-        object.__setattr__(self, 'equity', equity)
-        object.__setattr__(self, 'cash', cash)
-        object.__setattr__(self, 'positions', MappingProxyType(dict(positions)))
-        object.__setattr__(self, 'weights', MappingProxyType(dict(weights)))
+    def __post_init__(self) -> None:
+        object.__setattr__(self, 'positions', MappingProxyType(dict(self.positions)))
+        object.__setattr__(self, 'weights', MappingProxyType(dict(self.weights)))
 
 class Signal:
     """Base class for all strategy signals returned by on_data()."""
@@ -140,7 +137,8 @@ class TargetWeights(Signal):
                 f"Weights sum to {total:.6f}, which exceeds 1.0. "
                 "Use weights that sum to at most 1.0 (remainder is held as cash)."
             )
-         # freeze after validation
+        
+        # freeze after validation
         object.__setattr__(self, 'weights', MappingProxyType(dict(self.weights)))
 
 class Hold(Signal):
