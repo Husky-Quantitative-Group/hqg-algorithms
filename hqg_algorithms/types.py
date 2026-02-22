@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import Mapping, Optional
+from types import MappingProxyType
 
 
 class BarSize(str, Enum):
@@ -104,6 +105,12 @@ class PortfolioView:
     positions: dict[str, float]   # quantity of each symbol
     weights: dict[str, float]     # current portfolio weights (by value)
 
+    def __init__(self, equity: float, cash: float,
+                 positions: dict[str, float], weights: dict[str, float]):
+        object.__setattr__(self, 'equity', equity)
+        object.__setattr__(self, 'cash', cash)
+        object.__setattr__(self, 'positions', MappingProxyType(dict(positions)))
+        object.__setattr__(self, 'weights', MappingProxyType(dict(weights)))
 
 class Signal:
     """Base class for all strategy signals returned by on_data()."""
@@ -133,6 +140,8 @@ class TargetWeights(Signal):
                 f"Weights sum to {total:.6f}, which exceeds 1.0. "
                 "Use weights that sum to at most 1.0 (remainder is held as cash)."
             )
+         # freeze after validation
+        object.__setattr__(self, 'weights', MappingProxyType(dict(self.weights)))
 
 class Hold(Signal):
     """
