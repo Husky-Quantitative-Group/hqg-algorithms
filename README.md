@@ -12,18 +12,20 @@ pip install hqg-algorithms
 
 Subclass `Strategy` and implement three methods:
 ```python
-from hqg_algorithms import Strategy, Cadence, Slice, PortfolioView, BarSize, ExecutionTiming
-
+from hqg_algorithms import (
+    Strategy, Cadence, Slice, PortfolioView,
+    BarSize, ExecutionTiming, Signal, TargetWeights,
+)
 
 class BuyAndRebalance(Strategy):
     def universe(self) -> list[str]:
         return ["SPY", "IEF"]
 
     def cadence(self) -> Cadence:
-        return Cadence(bar_size=BarSize.DAILY, execution=ExecutionTiming.CLOSE_TO_CLOSE)
+        return Cadence(bar_size=BarSize.DAILY, execution=ExecutionTiming.CLOSE_TO_NEXT_OPEN)
 
-    def on_data(self, data: Slice, portfolio: PortfolioView) -> dict[str, float] | None:
-        return {"SPY": 0.6, "IEF": 0.4}
+    def on_data(self, data: Slice, portfolio: PortfolioView) -> Signal:
+        return TargetWeights({"SPY": 0.6, "IEF": 0.4})
 ```
 
 | Method | Purpose |
@@ -46,9 +48,23 @@ class BuyAndRebalance(Strategy):
 
 `CLOSE_TO_NEXT_OPEN` is the most realistic for intradaily strategies since it avoids look-ahead bias - your signal only uses data that was already available before the trade executes. The other two modes assume you can observe a price and trade at that same price.
 
+### Signal types
+
+`on_data()` returns a `Signal` that tells the backtester what to do:
+
+| Signal | Meaning |
+| -------- | --------- |
+| `TargetWeights({"SPY": 0.6, "IEF": 0.4})` | Rebalance to these weights. Omitted symbols are sold to zero. Weights summing to less than 1.0 leave the remainder in cash. |
+| `Hold()` | Keep the current allocation unchanged. |
+| `Liquidate()` | Sell all positions and move fully to cash. |
+
+
 ## Example — SMA crossover
 ```python
-from hqg_algorithms import Strategy, Cadence, Slice, PortfolioView, BarSize, ExecutionTiming
+from hqg_algorithms import (
+    Strategy, Cadence, Slice, PortfolioView,
+    BarSize, ExecutionTiming, Signal, TargetWeights, Hold,
+)
 from collections import deque
 
 
@@ -65,21 +81,21 @@ class SimpleSMA(Strategy):
     def cadence(self) -> Cadence:
         return Cadence(bar_size=BarSize.DAILY, execution=ExecutionTiming.CLOSE_TO_NEXT_OPEN)
 
-    def on_data(self, data: Slice, portfolio: PortfolioView) -> dict[str, float] | None:
+    def on_data(self, data: Slice, portfolio: PortfolioView) -> Signal:
         spy_close = data.close("SPY")
         if spy_close is None:
-            return None
+            return Hold()
 
         self._q.append(spy_close)
 
         if len(self._q) < self._window:
-            return {"BND": 1.0}  # hold bonds while warming up
+            return TargetWeights({"BND": 1.0})  # hold bonds while warming up
 
         sma = sum(self._q) / len(self._q)
 
         if spy_close > sma:
-            return {"SPY": 0.5, "BND": 0.5}  # uptrend
-        return {"BND": 1.0}                  # downtrend
+            return TargetWeights({"SPY": 0.5, "BND": 0.5})  # uptrend
+        return TargetWeights({"BND": 1.0})                   # downtrend
 ```
 
 ## Additional docs

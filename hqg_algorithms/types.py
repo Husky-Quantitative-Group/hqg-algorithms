@@ -1,7 +1,7 @@
 """types.py"""
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Mapping, Optional
 
 
 class BarSize(str, Enum):
@@ -88,3 +88,29 @@ class PortfolioView:
     cash: float                   # available, unallocated cash
     positions: dict[str, float]   # quantity of each symbol
     weights: dict[str, float]     # current portfolio weights (by value)
+
+class Signal:
+    """Base class for all strategy signals returned by on_data()."""
+
+@dataclass(frozen=True)
+class TargetWeights(Signal):
+    """
+    Set the portfolio to the given target weights.
+
+    - Symbols present in `weights` are sized to the specified fraction of portfolio equity. 
+    - Symbols absent from `weights` are sold to zero.
+    - Weights summing to less than 1.0 leave the remainder in cash.
+    """
+    weights: Mapping[str, float]
+
+
+class Hold(Signal):
+    """
+    Keep the current portfolio unchanged this bar.
+    """
+
+
+class Liquidate(Signal):
+    """
+    Sell all positions and move fully to cash.
+    """

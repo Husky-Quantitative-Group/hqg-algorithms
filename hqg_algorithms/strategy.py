@@ -1,6 +1,6 @@
 """strategy.py"""
 from abc import ABC, abstractmethod
-from hqg_algorithms.types import Cadence, Slice, PortfolioView
+from hqg_algorithms.types import Cadence, Slice, PortfolioView, Signal
 
 class Strategy(ABC):
     """
@@ -9,7 +9,7 @@ class Strategy(ABC):
     Each subclass defines:
       - The asset universe it trades.
       - The cadence (how often it's called and when trades execute).
-      - The trading logic that converts data into target portfolio weights.
+      - The trading logic that converts data into a Signal.
 
     The backtester calls:
       1. strategy.universe() to know what tickers to load.
@@ -43,7 +43,7 @@ class Strategy(ABC):
         """
 
     @abstractmethod
-    def on_data(self, data: Slice, portfolio: PortfolioView) -> dict[str, float] | None:
+    def on_data(self, data: Slice, portfolio: PortfolioView) -> Signal:
         """
         Main signal logic.
 
@@ -54,15 +54,15 @@ class Strategy(ABC):
             portfolio: a read-only PortfolioView with current equity, cash, positions,
                 and weights.
 
-        Returns:
-            dict[str, float]: target portfolio weights, e.g. {"SPY": 0.6, "IEF": 0.4}
-            or None to indicate no change to previous allocation.
-
-        - The returned dictionary expresses the complete target allocation.
-        - If a symbol is omitted, we sell it down to zero.
-        - Sum of weights less than 1 implies remaining balance held as cash.
-        - {} means we should convert our portfolio to fully cash.
-        - None means skip rebalance (no signal update this bar).
+        Returns one of:
+            TargetWeights({"SPY": 0.6, "IEF": 0.4})
+                - Set the portfolio to these target weights. 
+                - Omitted symbols are sold to zero.
+                - Weights summing to less than 1.0 leave the remainder in cash.
+            Hold()
+                Keep the current allocation unchanged (skip this bar).
+            Liquidate()
+                Sell everything and move fully to cash.
 
         Called automatically according to cadence().
         """
