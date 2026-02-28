@@ -7,7 +7,7 @@ name = "hqg-algorithms"
 version = "1.0.0"
 description = "Algorithmic trading research utilities for quant teams"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 
 [tool.setuptools]
 packages = ["hqg_algorithms"]

@@ -12,7 +12,7 @@ class BarSize(str, Enum):
     QUARTERLY = "1q"
 
 class ExecutionTiming(str, Enum):
-    CLOSE_TO_CLOSE = "close_to_close"           # signal on close, fill same close
+    CLOSE_TO_CLOSE = "close_to_close"           # DEFAULT: signal on close, fill same close
     CLOSE_TO_NEXT_OPEN = "close_to_next_open"   # signal on close, fill next open
     OPEN_TO_OPEN = "open_to_open"               # signal on open, fill same open
 
