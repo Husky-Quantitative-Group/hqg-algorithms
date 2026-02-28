@@ -11,7 +11,7 @@ pip install hqg-algorithms
 
 ## Quick start
 
-Subclass `Strategy` and implement three methods:
+Subclass `Strategy`, declare your `universe` and `cadence`, and implement `on_data`:
 
 ```python
 from hqg_algorithms import (
@@ -20,21 +20,23 @@ from hqg_algorithms import (
 )
 
 class BuyAndRebalance(Strategy):
-    def universe(self) -> list[str]:
-        return ["SPY", "IEF"]
-
-    def cadence(self) -> Cadence:
-        return Cadence(bar_size=BarSize.DAILY, execution=ExecutionTiming.CLOSE_TO_NEXT_OPEN)
+    universe = ["SPY", "IEF"]
+    cadence = Cadence(bar_size=BarSize.DAILY, execution=ExecutionTiming.CLOSE_TO_CLOSE)
 
     def on_data(self, data: Slice, portfolio: PortfolioView) -> Signal:
         return TargetWeights({"SPY": 0.6, "IEF": 0.4})
 ```
 
-| Method | Purpose |
-| -------- | --------- |
-| `universe()` | Symbols the platform loads for this strategy |
-| `cadence()` | Bar resolution and execution timing |
-| `on_data()` | Return a `Signal`: `TargetWeights(...)`, `Hold()`, or `Liquidate()` |
+| Declaration | Purpose | Required? |
+| -------- | --------- | --------- |
+| `universe` | List of ticker strings the platform loads for this strategy | Yes |
+| `cadence` | Bar resolution and execution timing (optional - defaults to daily, close-to-close) | No |
+| `on_data()` | Return a `Signal`: `TargetWeights(...)`, `Hold()`, or `Liquidate()` | Yes |
+
+### Important constraints
+
+- `universe` **must** be a non-empty list literal of ticker strings (e.g. `["SPY", "IEF"]`). Variables, function calls, and concatenation are not supported.
+- `cadence` **must** be a direct `Cadence(...)` call with `BarSize.X` and/or `ExecutionTiming.Y` keyword arguments. If omitted, it defaults to `Cadence(bar_size=BarSize.DAILY, execution=ExecutionTiming.CLOSE_TO_CLOSE)`.
 
 `Slice` maps each symbol to a `Bar` dataclass with typed fields (`open`, `high`, `low`, `close`, `volume`). You can access prices via helpers like `data.close("SPY")`, or grab the full bar with `data.bar("SPY")` for direct attribute access. `PortfolioView` gives read-only access to current equity, cash, positions, and weights.
 
@@ -60,7 +62,7 @@ class BuyAndRebalance(Strategy):
 | `Hold()` | Keep the current allocation unchanged. |
 | `Liquidate()` | Sell all positions and move fully to cash. |
 
-## Example — SMA crossover
+## Example - SMA crossover
 
 ```python
 from hqg_algorithms import (
@@ -73,15 +75,12 @@ from collections import deque
 class SimpleSMA(Strategy):
     """Go risk-on when SPY is above its 21-day mean, otherwise hold bonds."""
 
+    universe = ["SPY", "BND"]
+    cadence = Cadence(bar_size=BarSize.DAILY, execution=ExecutionTiming.CLOSE_TO_CLOSE)
+
     def __init__(self):
         self._window = 21
         self._q: deque[float] = deque(maxlen=self._window)
-
-    def universe(self) -> list[str]:
-        return ["SPY", "BND"]
-
-    def cadence(self) -> Cadence:
-        return Cadence(bar_size=BarSize.DAILY, execution=ExecutionTiming.CLOSE_TO_NEXT_OPEN)
 
     def on_data(self, data: Slice, portfolio: PortfolioView) -> Signal:
         spy_close = data.close("SPY")
