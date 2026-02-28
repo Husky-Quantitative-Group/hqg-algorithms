@@ -1,5 +1,6 @@
 """strategy.py"""
 from abc import ABC, abstractmethod
+from typing import Callable
 from hqg_algorithms.types import Cadence, Slice, PortfolioView, Signal
 
 class Strategy(ABC):
@@ -36,6 +37,8 @@ class Strategy(ABC):
     cadence: Cadence = Cadence()
     """How often on_data is called and when trades fill. Defaults to daily, close-to-close."""
 
+    _log_handler: Callable[[str], None] = staticmethod(print)
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if not hasattr(cls, 'universe') or not isinstance(cls.universe, list) or len(cls.universe) == 0:
@@ -43,6 +46,11 @@ class Strategy(ABC):
                 f"{cls.__name__} must define 'universe' as a non-empty list of tickers. "
                 f'e.g. universe = ["SPY", "IEF"]'
             )
+    
+
+    def log(self, message: str) -> None:
+        self._log_handler(message)
+
 
     @abstractmethod
     def on_data(self, data: Slice, portfolio: PortfolioView) -> Signal:
