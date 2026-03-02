@@ -46,9 +46,8 @@ class BuyAndRebalance(Strategy):
 
 | `ExecutionTiming` | `on_data` fires at | Trades fill at |
 | --- | --- | --- |
-| `CLOSE_TO_NEXT_OPEN` | Bar close | Next bar's open |
 | `CLOSE_TO_CLOSE` | Bar close | Same bar's close (DEFAULT) |
-| `OPEN_TO_OPEN` | Bar open | Same bar's open |
+| `CLOSE_TO_NEXT_OPEN` | Bar close | Next bar's open |
 
 `CLOSE_TO_NEXT_OPEN` is the most realistic for intradaily strategies since it avoids look-ahead bias - your signal only uses data that was already available before the trade executes. The other two modes assume you can observe a price and trade at that same price.
 

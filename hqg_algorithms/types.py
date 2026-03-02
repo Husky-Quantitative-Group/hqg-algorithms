@@ -14,7 +14,6 @@ class BarSize(str, Enum):
 class ExecutionTiming(str, Enum):
     CLOSE_TO_CLOSE = "close_to_close"           # DEFAULT: signal on close, fill same close
     CLOSE_TO_NEXT_OPEN = "close_to_next_open"   # signal on close, fill next open
-    OPEN_TO_OPEN = "open_to_open"               # signal on open, fill same open
 
 
 @dataclass(frozen=True)
