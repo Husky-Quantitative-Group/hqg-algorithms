@@ -251,7 +251,7 @@ class TestCadenceImmutability:
     def test_cannot_set_execution(self):
         c = Cadence()
         with pytest.raises(AttributeError):
-            c.execution = ExecutionTiming.OPEN_TO_OPEN
+            c.execution = ExecutionTiming.CLOSE_TO_CLOSE
 
 
 # ── Hold / Liquidate ────────────────────────────────────────────────

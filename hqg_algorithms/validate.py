@@ -61,8 +61,7 @@ def _check_universe(cls: ast.ClassDef) -> Optional[list[str]]:
 def _check_cadence(cls: ast.ClassDef) -> Optional[list[str]]:
     """Returns None if no cadence found (ok, uses default), [] if valid, [errors] if invalid."""
     VALID_BAR_SIZES = {"DAILY", "WEEKLY", "MONTHLY", "QUARTERLY"}
-    VALID_EXECUTIONS = {"CLOSE_TO_CLOSE", "CLOSE_TO_NEXT_OPEN", "OPEN_TO_OPEN"}
-
+    VALID_EXECUTIONS = {"CLOSE_TO_CLOSE", "CLOSE_TO_NEXT_OPEN"}
     for item in cls.body:
         if not isinstance(item, ast.Assign):
             continue
