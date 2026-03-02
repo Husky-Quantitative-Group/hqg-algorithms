@@ -1,14 +1,28 @@
 """validate.py"""
 import ast
+from dataclasses import dataclass
 from typing import Optional
 
-from hqg_algorithms.types import BarSize, ExecutionTiming
+from hqg_algorithms.types import BarSize, ExecutionTiming, Cadence
+
 
 VALID_BAR_SIZES = {e.name for e in BarSize}
 VALID_EXECUTIONS = {e.name for e in ExecutionTiming}
 VALID_CADENCE_KWARGS = {"bar_size", "execution"}
+BARSIZE_MAP = {e.name: e for e in BarSize}
+EXECUTION_MAP = {e.name: e for e in ExecutionTiming}
+
+MAX_TICKER_LEN = 12
+MAX_UNIVERSE_SIZE = 200
 
 
+@dataclass(frozen=True)
+class StrategyMetadata:
+    universe: list[str]
+    cadence: Cadence
+
+
+# public
 def validate_strategy(source: str) -> list[str]:
     """
     Validate strategy source code without executing it.
@@ -48,7 +62,30 @@ def validate_strategy(source: str) -> list[str]:
 
     return errors
 
+# public
+def get_strategy_metadata(source: str) -> StrategyMetadata:
+    """
+    Parse strategy source code and extract universe + cadence.
+    No code is executed. Raises ValueError if source is invalid.
+    """
+    errors = validate_strategy(source)
+    if errors:
+        raise ValueError("Invalid strategy:\n" + "\n".join(f"  - {e}" for e in errors))
 
+    tree = ast.parse(source)
+    cls = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef) and _is_strategy_subclass(node)
+    )
+
+    universe = _extract_universe(cls)
+    cadence = _extract_cadence(cls)
+
+    return StrategyMetadata(universe=universe, cadence=cadence)
+
+
+
+### parsing helpers
 def _is_strategy_subclass(node: ast.ClassDef) -> bool:
     """Check if a class inherits from Strategy (handles `Strategy` and `mod.Strategy`)."""
     return any(
@@ -72,9 +109,7 @@ def _get_class_assign(cls: ast.ClassDef, name: str) -> Optional[ast.expr]:
     return None
 
 
-MAX_TICKER_LEN = 12
-MAX_UNIVERSE_SIZE = 200
-
+### Validation checks
 def _check_universe(cls: ast.ClassDef) -> Optional[list[str]]:
     """Returns None if no universe found, [] if valid, [errors] if invalid."""
     value = _get_class_assign(cls, "universe")
@@ -117,7 +152,7 @@ def _check_universe(cls: ast.ClassDef) -> Optional[list[str]]:
         errors.append("'universe' has no valid tickers after cleaning")
 
     if valid_count > MAX_UNIVERSE_SIZE:
-        errors.append(f"universe has {valid_count} distinct tickers (max {MAX_UNIVERSE_SIZE})")
+        errors.append(f"universe has {valid_count} valid tickers (max {MAX_UNIVERSE_SIZE})")
 
     return errors
 
@@ -164,3 +199,39 @@ def _check_on_data(cls: ast.ClassDef) -> Optional[list[str]]:
         if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == "on_data":
             return []
     return ["Missing 'on_data' method"]
+
+
+### Extraction (post-validation)
+def _extract_universe(cls: ast.ClassDef) -> list[str]:
+    """Extract and clean universe. Only called after validation passes."""
+    value = _get_class_assign(cls, "universe")
+    raw = ast.literal_eval(value)
+
+    seen = set()
+    cleaned = []
+    for item in raw:
+        ticker = item.strip().upper()
+        if ticker and ticker not in seen:
+            seen.add(ticker)
+            cleaned.append(ticker)
+
+    return cleaned
+
+
+def _extract_cadence(cls: ast.ClassDef) -> Cadence:
+    """Extract cadence. Only called after validation passes."""
+    value = _get_class_assign(cls, "cadence")
+    if value is None:
+        return Cadence()
+
+    bar_size = BarSize.DAILY
+    execution = ExecutionTiming.CLOSE_TO_CLOSE
+
+    for kw in value.keywords:
+        attr = kw.value.attr
+        if kw.arg == "bar_size":
+            bar_size = BARSIZE_MAP[attr]
+        elif kw.arg == "execution":
+            execution = EXECUTION_MAP[attr]
+
+    return Cadence(bar_size=bar_size, execution=execution)
