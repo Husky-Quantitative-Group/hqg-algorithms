@@ -4,9 +4,10 @@ from .types import (
     Cadence, Slice, Bar, PortfolioView, BarSize, ExecutionTiming,
     Signal, TargetWeights, Hold, Liquidate,
 )
+from .validate import validate_strategy
 
 __all__ = [
     "Strategy", "Cadence", "Slice", "Bar", "PortfolioView",
     "BarSize", "ExecutionTiming",
-    "Signal", "TargetWeights", "Hold", "Liquidate",
+    "Signal", "TargetWeights", "Hold", "Liquidate", "validate_strategy"
 ]
