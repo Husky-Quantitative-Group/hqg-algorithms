@@ -35,8 +35,9 @@ class BuyAndRebalance(Strategy):
 
 ### Important constraints
 
-- `universe` **must** be a non-empty list literal of ticker strings (e.g. `["SPY", "IEF"]`). Variables, function calls, and concatenation are not supported.
-- `cadence` **must** be a direct `Cadence(...)` call with `BarSize.X` and/or `ExecutionTiming.Y` keyword arguments. If omitted, it defaults to `Cadence(bar_size=BarSize.DAILY, execution=ExecutionTiming.CLOSE_TO_CLOSE)`.
+- `universe` **must** be a non-empty list literal of ticker strings (e.g. `["SPY", "IEF"]`). Variables, function calls, and concatenation are not supported. Tickers are normalized to uppercase and deduplicated. Empty strings, whitespace-only tickers, and tickers exceeding 12 characters are rejected. Maximum universe size is 200.
+- `cadence` **must** be a direct `Cadence(...)` call with `BarSize.X` and/or `ExecutionTiming.Y` keyword arguments. Positional arguments and unknown keyword arguments are rejected. If omitted, it defaults to `Cadence(bar_size=BarSize.DAILY, execution=ExecutionTiming.CLOSE_TO_CLOSE)`.
+- Both `universe` and `cadence` are fixed at class definition and cannot be changed at runtime.
 
 `Slice` maps each symbol to a `Bar` dataclass with typed fields (`open`, `high`, `low`, `close`, `volume`). You can access prices via helpers like `data.close("SPY")`, or grab the full bar with `data.bar("SPY")` for direct attribute access. `PortfolioView` gives read-only access to current equity, cash, positions, and weights.
 
@@ -49,7 +50,7 @@ class BuyAndRebalance(Strategy):
 | `CLOSE_TO_CLOSE` | Bar close | Same bar's close (DEFAULT) |
 | `CLOSE_TO_NEXT_OPEN` | Bar close | Next bar's open |
 
-`CLOSE_TO_NEXT_OPEN` is the most realistic for intradaily strategies since it avoids look-ahead bias - your signal only uses data that was already available before the trade executes. The other two modes assume you can observe a price and trade at that same price.
+`CLOSE_TO_NEXT_OPEN` is the most realistic for intraday strategies since it avoids look-ahead bias - your signal only uses data that was already available before the trade executes.
 
 ### Signal types
 
@@ -61,12 +62,16 @@ class BuyAndRebalance(Strategy):
 | `Hold()` | Keep the current allocation unchanged. |
 | `Liquidate()` | Sell all positions and move fully to cash. |
 
-## Validating strategies
+## Validating and parsing strategies
 
-Use `validate_strategy` to check strategy source code without executing it. It parses the code with `ast` and verifies that `universe`, `cadence`, and `on_data` are declared correctly (in a way that services expect).
+The `parsing` module provides two functions for working with strategy source code without executing it. Both use AST parsing - no user code is ever run.
+
+### `validate_strategy`
+
+Checks strategy source code and returns a list of error strings. An empty list means the strategy is valid.
 
 ```python
-from hqg_algorithms.validate import validate_strategy
+from hqg_algorithms import validate_strategy
 
 source = open("my_strategy.py").read()
 errors = validate_strategy(source)
@@ -78,17 +83,38 @@ else:
     print("✅ Strategy is valid")
 ```
 
-`validate_strategy` returns a list of error strings - an empty list means the strategy is valid. It checks:
-
 | Check | Rule |
 | --- | --- |
 | **Syntax** | Source must be parseable Python |
-| **Strategy class** | At least one class must define a `universe` attribute |
-| **`universe`** | Must be a non-empty list literal containing only strings |
-| **`cadence`** | If present, must be a `Cadence(...)` call with valid `BarSize` / `ExecutionTiming` keyword args |
+| **Strategy class** | At least one class inheriting from `Strategy` must be present |
+| **`universe`** | Must be a non-empty list literal of valid ticker strings |
+| **`cadence`** | If present, must be a `Cadence(...)` call with valid keyword args only |
 | **`on_data`** | Must be defined as a method on the strategy class |
 
-This is useful for things like editor integrations or pre-submission validation in web UIs where you want fast feedback before sending code to a service.
+All errors are blocking - if `validate_strategy` returns anything, the strategy cannot run.
+
+### `get_strategy_metadata`
+
+Extracts `universe` and `cadence` as typed objects. Raises `ValueError` if the source is invalid.
+
+```python
+from hqg_algorithms import get_strategy_metadata
+
+meta = get_strategy_metadata(source)
+print(meta.universe)   # ["SPY", "IEF"] (normalized, deduplicated)
+print(meta.cadence)    # Cadence(bar_size=BarSize.DAILY, execution=ExecutionTiming.CLOSE_TO_CLOSE)
+```
+
+Returns a frozen `StrategyMetadata` dataclass:
+
+```python
+@dataclass(frozen=True)
+class StrategyMetadata:
+    universe: list[str]
+    cadence: Cadence
+```
+
+This is intended for services that need to know what a strategy requires (data subscriptions, scheduling) without loading it.
 
 ## Example - SMA crossover
 
