@@ -61,6 +61,35 @@ class BuyAndRebalance(Strategy):
 | `Hold()` | Keep the current allocation unchanged. |
 | `Liquidate()` | Sell all positions and move fully to cash. |
 
+## Validating strategies
+
+Use `validate_strategy` to check strategy source code without executing it. It parses the code with `ast` and verifies that `universe`, `cadence`, and `on_data` are declared correctly (in a way that services expect).
+
+```python
+from hqg_algorithms.validate import validate_strategy
+
+source = open("my_strategy.py").read()
+errors = validate_strategy(source)
+
+if errors:
+    for e in errors:
+        print(f"❌ {e}")
+else:
+    print("✅ Strategy is valid")
+```
+
+`validate_strategy` returns a list of error strings - an empty list means the strategy is valid. It checks:
+
+| Check | Rule |
+| --- | --- |
+| **Syntax** | Source must be parseable Python |
+| **Strategy class** | At least one class must define a `universe` attribute |
+| **`universe`** | Must be a non-empty list literal containing only strings |
+| **`cadence`** | If present, must be a `Cadence(...)` call with valid `BarSize` / `ExecutionTiming` keyword args |
+| **`on_data`** | Must be defined as a method on the strategy class |
+
+This is useful for things like editor integrations or pre-submission validation in web UIs where you want fast feedback before sending code to a service.
+
 ## Example - SMA crossover
 
 ```python
