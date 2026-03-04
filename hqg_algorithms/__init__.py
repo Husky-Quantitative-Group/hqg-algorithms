@@ -4,11 +4,13 @@ from .types import (
     Cadence, Slice, Bar, PortfolioView, BarSize, ExecutionTiming,
     Signal, TargetWeights, Hold, Liquidate,
 )
-from .parsing import validate_strategy, get_strategy_metadata, StrategyMetadata
+from .parsing import (
+    validate_strategy, get_strategy_metadata, extract_metadata, StrategyMetadata
+)
 
 __all__ = [
     "Strategy", "Cadence", "Slice", "Bar", "PortfolioView",
     "BarSize", "ExecutionTiming",
     "Signal", "TargetWeights", "Hold", "Liquidate",
-    "validate_strategy", "get_strategy_metadata", "StrategyMetadata",
+    "validate_strategy", "get_strategy_metadata", "extract_metadata", "StrategyMetadata",
 ]
