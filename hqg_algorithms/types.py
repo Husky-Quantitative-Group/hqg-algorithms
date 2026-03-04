@@ -1,7 +1,8 @@
 """types.py"""
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Mapping, Optional
+from types import MappingProxyType
 
 
 class BarSize(str, Enum):
@@ -10,67 +11,141 @@ class BarSize(str, Enum):
     MONTHLY = "1m"
     QUARTERLY = "1q"
 
-class CallPhase(str, Enum):
-    ON_BAR_CLOSE = "on_bar_close"
-    ON_BAR_OPEN = "on_bar_open"
+class ExecutionTiming(str, Enum):
+    CLOSE_TO_CLOSE = "close_to_close"           # DEFAULT: signal on close, fill same close
+    CLOSE_TO_NEXT_OPEN = "close_to_next_open"   # signal on close, fill next open
 
 
 @dataclass(frozen=True)
 class Cadence:
     """Defines how often a strategy runs and when trades execute."""
-    bar_size: BarSize = BarSize.DAILY              # bar resolution (1d, 1w, 1m, 1q)
-    call_phase: CallPhase = CallPhase.ON_BAR_CLOSE # when on_data fires within each bar
-    exec_lag_bars: int = 0                         # bars between signal and execution
+    bar_size: BarSize = BarSize.DAILY                               # bar resolution (1d, 1w, 1m, 1q)
+    execution: ExecutionTiming = ExecutionTiming.CLOSE_TO_CLOSE     # signal on close, fill same close
 
 
-class Slice(dict[str, dict[str, float]]):
+@dataclass(frozen=True)
+class Bar:
+    """OHLCV data for a single symbol at one timestep."""
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: Optional[float]     # not available for all data
+
+
+class Slice(Mapping[str, Bar]):
     """
     Snapshot of OHLCV data for all symbols at one timestep.
 
     Structure:
         {
-            "SPY": {"open": 444.2, "high": 445.0, "low": 443.9,
-                    "close": 444.5, "volume": 1.2e7},
-            "IEF": {"open": 97.1,  "high": 97.5,  "low": 97.0,
-                    "close": 97.4,  "volume": 4.1e6},
+            "SPY": Bar(open=444.2, high=445.0, low=443.9, close=444.5, volume=1.2e7),
+            "IEF": Bar(open=97.1,  high=97.5,  low=97.0, close=97.4,  volume=4.1e6),
         }
     """
 
+    def __init__(self, data: dict[str, Bar]):
+        self._data = dict(data)
+
+    def __getitem__(self, key: str) -> Bar:
+        return self._data[key]
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __repr__(self) -> str:
+        return f"Slice({self._data!r})"
+
     def symbols(self) -> list[str]:
         """Return list of all symbols in this slice."""
-        return list(self.keys())
+        return list(self._data.keys())
 
     def has(self, symbol: str) -> bool:
         """Check whether this slice includes a given symbol."""
-        return symbol in self
+        return symbol in self._data
 
-    def _get_field(self, symbol: str, field: str) -> Optional[float]:
-        """Return a specific OHLCV field for a symbol, or None if missing."""
-        return self.get(symbol, {}).get(field)
+    def bar(self, symbol: str) -> Optional[Bar]:
+        """Return the full Bar for a symbol, or None if missing."""
+        return self._data.get(symbol)
 
     def open(self, symbol: str) -> Optional[float]:
         """Return the open price for a symbol, or None if missing."""
-        return self._get_field(symbol, "open")
+        b = self._data.get(symbol)
+        return b.open if b is not None else None
 
     def high(self, symbol: str) -> Optional[float]:
         """Return the high price for a symbol, or None if missing."""
-        return self._get_field(symbol, "high")
+        b = self._data.get(symbol)
+        return b.high if b is not None else None
 
     def low(self, symbol: str) -> Optional[float]:
         """Return the low price for a symbol, or None if missing."""
-        return self._get_field(symbol, "low")
+        b = self._data.get(symbol)
+        return b.low if b is not None else None
 
     def close(self, symbol: str) -> Optional[float]:
         """Return the close price for a symbol, or None if missing."""
-        return self._get_field(symbol, "close")
+        b = self._data.get(symbol)
+        return b.close if b is not None else None
 
     def volume(self, symbol: str) -> Optional[float]:
         """Return the volume for a symbol, or None if missing."""
-        return self._get_field(symbol, "volume")
+        b = self._data.get(symbol)
+        return b.volume if b is not None else None
+
 @dataclass(frozen=True)
 class PortfolioView:
     """Read-only snapshot of the strategy's current portfolio state."""
-    equity: float                 # total value of the strategy's portfolio
-    cash: float                   # available, unallocated cash
-    positions: dict[str, float]   # quantity of each symbol
-    weights: dict[str, float]     # current portfolio weights (by value)
+    equity: float                    # total value of the strategy's portfolio
+    cash: float                      # available, unallocated cash
+    positions: Mapping[str, float]   # quantity of each symbol
+    weights: Mapping[str, float]     # current portfolio weights (by value)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, 'positions', MappingProxyType(dict(self.positions)))
+        object.__setattr__(self, 'weights', MappingProxyType(dict(self.weights)))
+
+class Signal:
+    """Base class for all strategy signals returned by on_data()."""
+
+@dataclass(frozen=True)
+class TargetWeights(Signal):
+    """
+    Set the portfolio to the given target weights.
+
+    - Symbols present in `weights` are sized to the specified fraction of portfolio equity. 
+    - Symbols absent from `weights` are sold to zero.
+    - Weights summing to less than 1.0 leave the remainder in cash.
+    
+    Raises:
+        ValueError: If any weight is negative or weights sum above 1.0.
+        Bad input are likely a logic/math ERROR, not something we should try to clamp or normalize. 
+    """
+    weights: Mapping[str, float]
+
+    def __post_init__(self) -> None:
+        negative = {s: w for s, w in self.weights.items() if w < 0}
+        if negative:
+            raise ValueError(f"Negative weights are not allowed: {negative}")
+        total = sum(self.weights.values())
+        if total > 1.0 + 1e-7:
+            raise ValueError(
+                f"Weights sum to {total:.6f}, which exceeds 1.0. "
+                "Use weights that sum to at most 1.0 (remainder is held as cash)."
+            )
+        
+        # freeze after validation
+        object.__setattr__(self, 'weights', MappingProxyType(dict(self.weights)))
+
+class Hold(Signal):
+    """
+    Keep the current portfolio unchanged this bar.
+    """
+
+class Liquidate(Signal):
+    """
+    Sell all positions and move fully to cash.
+    """
