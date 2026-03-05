@@ -84,6 +84,11 @@ def get_strategy_metadata(source: str) -> StrategyMetadata:
     return StrategyMetadata(universe=universe, cadence=cadence)
 
 
+# Backward-compatible public alias used by hqg-backtester.
+def extract_metadata(source: str) -> StrategyMetadata:
+    return get_strategy_metadata(source)
+
+
 
 ### parsing helpers
 def _is_strategy_subclass(node: ast.ClassDef) -> bool:
