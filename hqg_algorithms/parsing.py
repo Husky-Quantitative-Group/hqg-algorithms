@@ -1,6 +1,7 @@
 """validate.py"""
 import ast
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from typing import Optional
 
 from hqg_algorithms.types import BarSize, ExecutionTiming, Cadence
@@ -14,12 +15,16 @@ EXECUTION_MAP = {e.name: e for e in ExecutionTiming}
 
 MAX_TICKER_LEN = 12
 MAX_UNIVERSE_SIZE = 200
+MAX_ALT_DATA_SIZE = 100
+MAX_ALTDATA_SYMBOL_LEN = 100
+ALT_DATA_ID_RE = re.compile(r"^[A-Z0-9_\-]+(?:\.[A-Z0-9_\-]+)+$")
 
 
 @dataclass(frozen=True)
 class StrategyMetadata:
     universe: list[str]
     cadence: Cadence
+    alt_data: list[str] = field(default_factory=list)
 
 
 # public
@@ -56,6 +61,10 @@ def validate_strategy(source: str) -> list[str]:
     if cadence_errors:
         errors.extend(cadence_errors)
 
+    alt_data_errors = _check_alt_data(cls)
+    if alt_data_errors:
+        errors.extend(alt_data_errors)
+
     on_data_errors = _check_on_data(cls)
     if on_data_errors:
         errors.extend(on_data_errors)
@@ -80,8 +89,9 @@ def get_strategy_metadata(source: str) -> StrategyMetadata:
 
     universe = _extract_universe(cls)
     cadence = _extract_cadence(cls)
+    alt_data = _extract_alt_data(cls)
 
-    return StrategyMetadata(universe=universe, cadence=cadence)
+    return StrategyMetadata(universe=universe, cadence=cadence, alt_data=alt_data)
 
 
 # Backward-compatible public alias used by hqg-backtester.
@@ -198,6 +208,49 @@ def _check_cadence(cls: ast.ClassDef) -> Optional[list[str]]:
     return errors
 
 
+def _check_alt_data(cls: ast.ClassDef) -> Optional[list[str]]:
+    """Returns None if no alt_data found (ok), [] if valid, [errors] if invalid."""
+    value = _get_class_assign(cls, "alt_data")
+    if value is None:
+        return None
+
+    try:
+        val = ast.literal_eval(value)
+    except (ValueError, TypeError):
+        return ["'alt_data' must be a list literal, e.g. [\"FRED.GDP\", \"FRED.DGS10\"]"]
+
+    if not isinstance(val, list):
+        return [f"'alt_data' must be a list, got {type(val).__name__}"]
+
+    errors = []
+    seen = set()
+    valid_count = 0
+    for i, item in enumerate(val):
+        if not isinstance(item, str):
+            errors.append(f"alt_data[{i}]: expected string, got {type(item).__name__} ({item!r})")
+            continue
+        series_id = item.strip().upper()
+        if not series_id:
+            errors.append(f"alt_data[{i}]: empty or whitespace-only series id")
+        elif len(series_id) > MAX_ALTDATA_SYMBOL_LEN:
+            errors.append(f"alt_data[{i}]: '{series_id}' exceeds {MAX_ALTDATA_SYMBOL_LEN} characters")
+        elif not ALT_DATA_ID_RE.fullmatch(series_id):
+            errors.append(
+                f"alt_data[{i}]: '{series_id}' must be in PROVIDER.SERIES form "
+                "with non-empty dot-separated segments containing letters, digits, underscores, or hyphens"
+            )
+        elif series_id in seen:
+            continue
+        else:
+            seen.add(series_id)
+            valid_count += 1
+
+    if valid_count > MAX_ALT_DATA_SIZE:
+        errors.append(f"alt_data has {valid_count} valid series ids (max {MAX_ALT_DATA_SIZE})")
+
+    return errors
+
+
 def _check_on_data(cls: ast.ClassDef) -> Optional[list[str]]:
     """Returns [] if valid, [errors] if missing or bad signature."""
     for item in cls.body:
@@ -219,6 +272,25 @@ def _extract_universe(cls: ast.ClassDef) -> list[str]:
         if ticker and ticker not in seen:
             seen.add(ticker)
             cleaned.append(ticker)
+
+    return cleaned
+
+
+def _extract_alt_data(cls: ast.ClassDef) -> list[str]:
+    """Extract and clean alternative data IDs. Only called after validation passes."""
+    value = _get_class_assign(cls, "alt_data")
+    if value is None:
+        return []
+
+    raw = ast.literal_eval(value)
+
+    seen = set()
+    cleaned = []
+    for item in raw:
+        series_id = item.strip().upper()
+        if series_id and series_id not in seen:
+            seen.add(series_id)
+            cleaned.append(series_id)
 
     return cleaned
 

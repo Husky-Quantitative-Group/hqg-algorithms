@@ -73,6 +73,17 @@ class MyStrategy(Strategy):
 """)
         assert errors == []
 
+    def test_alt_data_list_is_valid(self):
+        errors = validate_strategy("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = ["FRED.GDP", "FRED.DGS10"]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert errors == []
+
     def test_many_tickers(self):
         errors = validate_strategy("""
 class MyStrategy(Strategy):
@@ -189,6 +200,17 @@ class MyStrategy(Strategy):
         pass
 """)
         assert any("list" in e for e in errors)
+
+    def test_annotated_alt_data(self):
+        errors = validate_strategy("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data: list[str] = ["FRED.GDP"]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert errors == []
 
 
 # ── Strategy base class detection ────────────────────────────────────
@@ -679,6 +701,101 @@ class MyStrategy(Strategy):
         pass
 """)
         assert any("positional" in e.lower() or "keyword" in e.lower() for e in errors)
+
+
+# ── Bad alternative data ─────────────────────────────────────────────
+
+class TestBadAltData:
+    def test_alt_data_is_string(self):
+        errors = validate_strategy("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = "FRED.GDP"
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert any("alt_data" in e and "list" in e for e in errors)
+
+    def test_alt_data_has_non_string_elements(self):
+        errors = validate_strategy("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = ["FRED.GDP", 123]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert any("alt_data[1]" in e and "string" in e for e in errors)
+
+    def test_alt_data_has_empty_string(self):
+        errors = validate_strategy("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = ["   "]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert any("alt_data[0]" in e and "empty" in e for e in errors)
+
+    def test_alt_data_is_function_call(self):
+        errors = validate_strategy("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = get_macro_series()
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert any("alt_data" in e and "list literal" in e for e in errors)
+
+    @pytest.mark.parametrize("series_id", ["not_a_valid_series_id", "FRED..GDP", "123"])
+    def test_alt_data_rejects_invalid_series_id_shape(self, series_id):
+        errors = validate_strategy(f"""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = ["{series_id}"]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert any("alt_data[0]" in e and "PROVIDER.SERIES" in e for e in errors)
+
+    def test_alt_data_rejects_too_long_series_id(self):
+        errors = validate_strategy("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = ["FRED.THIS-SERIES-IDENTIFIER-IS-DELIBERATELY-MORE-THAN-ONE-HUNDRED-CHARACTERS-LONG-FOR-SAFETY-VALIDATION"]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert any("alt_data[0]" in e and "exceeds 100" in e for e in errors)
+
+    def test_alt_data_exceeds_max_size(self):
+        series = ", ".join(f'"FRED.S{i:03d}"' for i in range(101))
+        errors = validate_strategy(f"""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = [{series}]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert any("alt_data has 101 valid series ids" in e and "max 100" in e for e in errors)
+
+    def test_alt_data_at_max_size_ok(self):
+        series = ", ".join(f'"FRED.S{i:03d}"' for i in range(100))
+        errors = validate_strategy(f"""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = [{series}]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert errors == []
 
 
 # ── Unknown cadence kwargs ───────────────────────────────────────────

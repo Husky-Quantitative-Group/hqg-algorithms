@@ -1,8 +1,13 @@
 """types.py"""
+from __future__ import annotations
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
-from typing import Mapping, Optional
 from types import MappingProxyType
+from typing import Mapping, Optional
+
+AltSeries = Mapping[datetime, float]
+AltHistory = Mapping[str, AltSeries]
 
 
 class BarSize(str, Enum):
@@ -35,17 +40,37 @@ class Bar:
 
 class Slice(Mapping[str, Bar]):
     """
-    Snapshot of OHLCV data for all symbols at one timestep.
+    Frozen, point-in-time snapshot of data for one timestep.
+
+    OHLCV bars are the market data for this timestep.
+
+    Alternative data exposed through alt_series()/alt_value() must already
+    be point-in-time correct for this Slice's timestamp. Slice performs no
+    available_at filtering itself and cannot detect a violation; the caller
+    constructing each Slice is responsible for enforcing that no future
+    revisions are included. Each key is the OBSERVATION period the value describes (e.g. the start
+    of a fiscal quarter for GDP), not the date the value became known.
 
     Structure:
         {
             "SPY": Bar(open=444.2, high=445.0, low=443.9, close=444.5, volume=1.2e7),
             "IEF": Bar(open=97.1,  high=97.5,  low=97.0, close=97.4,  volume=4.1e6),
         }
+
+    Alt data (per series, via alt_series(series_id)):
+        {
+            datetime(2023, 1, 1): 17149.6,    # Q1 2023 GDP, latest known value
+            datetime(2023, 4, 1): 17299.9,    # Q2 2023 GDP, latest known value
+            ...
+        }
     """
 
-    def __init__(self, data: dict[str, Bar]):
+    def __init__(self, data: dict[str, Bar], alt_history: Optional[AltHistory] = None):
         self._data = dict(data)
+        # Per-series alt histories are expected to be immutable cached views
+        # from AltDataState. Preserve their object identity so unchanged
+        # series do not get copied on every Slice construction.
+        self._alt_history = MappingProxyType(dict(alt_history or {}))
 
     def __getitem__(self, key: str) -> Bar:
         return self._data[key]
@@ -95,6 +120,17 @@ class Slice(Mapping[str, Bar]):
         """Return the volume for a symbol, or None if missing."""
         b = self._data.get(symbol)
         return b.volume if b is not None else None
+
+    def alt_series(self, series_id: str) -> AltSeries:
+        """Return the point-in-time snapshot of alt-data history for a series."""
+        return self._alt_history.get(series_id, MappingProxyType({}))
+
+    def alt_value(self, series_id: str) -> Optional[float]:
+        """Return the latest value for an alternative data series."""
+        series = self.alt_series(series_id)
+        if not series:
+            return None
+        return series[max(series)]
 
 @dataclass(frozen=True)
 class PortfolioView:
