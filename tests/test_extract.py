@@ -19,6 +19,28 @@ class MyStrategy(Strategy):
         assert meta.universe == ["SPY", "IEF", "GLD"]
         assert meta.cadence.bar_size == BarSize.WEEKLY
         assert meta.cadence.execution == ExecutionTiming.CLOSE_TO_NEXT_OPEN
+        assert meta.alt_data == []
+
+    def test_alt_data_extracted(self):
+        meta = get_strategy_metadata("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = ["FRED.GDP", "FRED.DGS10"]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert meta.alt_data == ["FRED.GDP", "FRED.DGS10"]
+
+    def test_alt_data_omitted_uses_empty_list(self):
+        meta = get_strategy_metadata("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert meta.alt_data == []
 
     def test_cadence_omitted_uses_defaults(self):
         meta = get_strategy_metadata("""
@@ -202,6 +224,17 @@ class MyStrategy(Strategy):
         assert meta.universe == ["SPY", "IEF"]
         assert meta.cadence.execution == ExecutionTiming.CLOSE_TO_NEXT_OPEN
 
+    def test_annotated_alt_data(self):
+        meta = get_strategy_metadata("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data: list[str] = ["FRED.GDP"]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert meta.alt_data == ["FRED.GDP"]
+
 
 # ── Universe normalization ───────────────────────────────────────────
 
@@ -255,6 +288,76 @@ class MyStrategy(Strategy):
         pass
 """)
         assert meta.universe == ["IEF", "SPY", "GLD"]
+
+
+# ── Alternative data normalization ───────────────────────────────────
+
+class TestAltDataNormalization:
+    def test_uppercases_series_ids(self):
+        meta = get_strategy_metadata("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = ["fred.gdp", "fred.dgs10"]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert meta.alt_data == ["FRED.GDP", "FRED.DGS10"]
+
+    def test_strips_whitespace(self):
+        meta = get_strategy_metadata("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = [" FRED.GDP ", "FRED.DGS10"]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert meta.alt_data == ["FRED.GDP", "FRED.DGS10"]
+
+    def test_deduplicates(self):
+        meta = get_strategy_metadata("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = ["FRED.GDP", "FRED.GDP"]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert meta.alt_data == ["FRED.GDP"]
+
+    def test_deduplicates_after_normalization(self):
+        meta = get_strategy_metadata("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = ["fred.gdp", "FRED.GDP"]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert meta.alt_data == ["FRED.GDP"]
+
+    def test_preserves_order_first_occurrence(self):
+        meta = get_strategy_metadata("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = ["FRED.DGS10", "FRED.GDP", "FRED.DGS10"]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert meta.alt_data == ["FRED.DGS10", "FRED.GDP"]
+
+    def test_allows_hyphenated_segments(self):
+        meta = get_strategy_metadata("""
+class MyStrategy(Strategy):
+    universe = ["SPY"]
+    alt_data = ["vendor.dataset-field"]
+
+    def on_data(self, data, portfolio):
+        pass
+""")
+        assert meta.alt_data == ["VENDOR.DATASET-FIELD"]
 
 
 # ── Strategy base class detection ────────────────────────────────────

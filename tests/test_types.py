@@ -1,6 +1,9 @@
 """test_types.py - verify all read-only protections on types."""
 
+from datetime import datetime
 import pytest
+from types import MappingProxyType
+
 from hqg_algorithms import (
     Bar, Slice, PortfolioView, TargetWeights, Hold, Liquidate,
     Cadence, BarSize, ExecutionTiming,
@@ -17,6 +20,22 @@ def bar():
 @pytest.fixture
 def slice_data(bar):
     return Slice({"SPY": bar, "IEF": Bar(open=97.0, high=97.5, low=96.8, close=97.3, volume=4e6)})
+
+
+@pytest.fixture
+def slice_with_alt_data(bar):
+    return Slice(
+        {"SPY": bar},
+        alt_history={
+            "FRED.GDP": MappingProxyType({
+                datetime(2023, 10, 1): 100.0,
+                datetime(2024, 1, 1): 101.0,
+            }),
+            "FRED.DGS10": MappingProxyType({
+                datetime(2024, 3, 1): 4.25,
+            }),
+        },
+    )
 
 
 @pytest.fixture
@@ -96,6 +115,21 @@ class TestSliceReadAccess:
         assert slice_data.open("AAPL") is None
         assert slice_data.close("AAPL") is None
 
+    def test_alt_series_returns_series_snapshot(self, slice_with_alt_data):
+        assert slice_with_alt_data.alt_series("FRED.GDP") == {
+            datetime(2023, 10, 1): 100.0,
+            datetime(2024, 1, 1): 101.0,
+        }
+
+    def test_alt_series_missing_returns_empty_mapping(self, slice_with_alt_data):
+        assert slice_with_alt_data.alt_series("FRED.CPI") == {}
+
+    def test_alt_value_returns_latest_observation_value(self, slice_with_alt_data):
+        assert slice_with_alt_data.alt_value("FRED.GDP") == 101.0
+
+    def test_alt_value_missing_returns_none(self, slice_with_alt_data):
+        assert slice_with_alt_data.alt_value("FRED.CPI") is None
+
 
 class TestSliceImmutability:
     def test_cannot_setitem(self, slice_data, bar):
@@ -131,6 +165,22 @@ class TestSliceImmutability:
         original["AAPL"] = Bar(open=9, high=9, low=9, close=9, volume=9)
         assert "AAPL" not in s
         assert len(s) == 1
+
+    def test_caller_alt_mapping_mutation_does_not_affect_slice(self, bar):
+        alt_history = {"FRED.GDP": {datetime(2024, 1, 1): 101.0}}
+        s = Slice({"SPY": bar}, alt_history=alt_history)
+        alt_history["FRED.CPI"] = {datetime(2024, 1, 1): 300.0}
+        assert s.alt_series("FRED.CPI") == {}
+
+    def test_preserves_alt_series_view_identity(self, bar):
+        gdp = MappingProxyType({datetime(2024, 1, 1): 101.0})
+        s = Slice({"SPY": bar}, alt_history={"FRED.GDP": gdp})
+        assert s.alt_series("FRED.GDP") is gdp
+
+    def test_alt_series_is_immutable(self, slice_with_alt_data):
+        series = slice_with_alt_data.alt_series("FRED.GDP")
+        with pytest.raises(TypeError):
+            series[datetime(2024, 4, 1)] = 102.0
 
 
 # ── PortfolioView (frozen dataclass + MappingProxyType) ─────────────
