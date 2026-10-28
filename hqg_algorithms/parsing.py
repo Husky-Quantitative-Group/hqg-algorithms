@@ -15,7 +15,7 @@ EXECUTION_MAP = {e.name: e for e in ExecutionTiming}
 
 MAX_TICKER_LEN = 12
 MAX_UNIVERSE_SIZE = 200
-MAX_ALT_DATA_SIZE = 100
+MAX_ALT_DATA_SIZE = 1000
 MAX_ALTDATA_SYMBOL_LEN = 100
 ALT_DATA_ID_RE = re.compile(r"^[A-Z0-9_\-]+(?:\.[A-Z0-9_\-]+)+$")
 

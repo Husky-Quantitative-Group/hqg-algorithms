@@ -774,7 +774,7 @@ class MyStrategy(Strategy):
         assert any("alt_data[0]" in e and "exceeds 100" in e for e in errors)
 
     def test_alt_data_exceeds_max_size(self):
-        series = ", ".join(f'"FRED.S{i:03d}"' for i in range(101))
+        series = ", ".join(f'"FRED.S{i:03d}"' for i in range(1001))
         errors = validate_strategy(f"""
 class MyStrategy(Strategy):
     universe = ["SPY"]
@@ -783,10 +783,10 @@ class MyStrategy(Strategy):
     def on_data(self, data, portfolio):
         pass
 """)
-        assert any("alt_data has 101 valid series ids" in e and "max 100" in e for e in errors)
+        assert any("alt_data has 1001 valid series ids" in e and "max 1000" in e for e in errors)
 
     def test_alt_data_at_max_size_ok(self):
-        series = ", ".join(f'"FRED.S{i:03d}"' for i in range(100))
+        series = ", ".join(f'"FRED.S{i:03d}"' for i in range(1000))
         errors = validate_strategy(f"""
 class MyStrategy(Strategy):
     universe = ["SPY"]
